@@ -1,41 +1,10 @@
-import { useEffect } from 'react'
 import { observer } from 'mobx-react-lite'
 
-import { A1111HostInput } from '~/components/HostInput'
+import HostInput from '~/components/HostInput'
 import NumberInput from '~/components/form/NumberInput'
+import EnabledCheckbox from '~/components/EnabledCheckbox'
 
-import { settingStore } from '~/models/SettingStore'
-
-const A1111EnabledCheckbox = observer(() => {
-  useEffect(() => {
-    if (settingStore.a1111Enabled) {
-      settingStore.fetchA1111Models()
-    }
-  }, [settingStore.a1111Enabled])
-
-  return (
-    <label className="label w-fit cursor-pointer gap-2">
-      <span className="label-text">Image Generation through AUTOMATIC1111:</span>
-
-      <div className="join">
-        {[true, false].map(isEnabled => (
-          <button
-            className={
-              'btn join-item btn-sm mr-0 ' +
-              (settingStore.a1111Enabled === isEnabled ? 'btn-active cursor-default ' : 'btn ')
-            }
-            onClick={() => settingStore.setA1111Enabled(isEnabled)}
-          >
-            <span>
-              {isEnabled ? 'Enable' : 'Disable'}
-              {settingStore.a1111Enabled === isEnabled ? 'd' : '?'}
-            </span>
-          </button>
-        ))}
-      </div>
-    </label>
-  )
-})
+import { DefaultA1111Host, settingStore } from '~/models/SettingStore'
 
 const A1111SizeSelector = observer(() => {
   const { a1111Width: width, a1111Height: height, a1111Enabled } = settingStore
@@ -162,8 +131,22 @@ const A1111BatchSizeSelector = observer(() => {
 const A1111GeneralPanel = observer(() => {
   return (
     <div className="flex w-full flex-col gap-4">
-      <A1111EnabledCheckbox />
-      <A1111HostInput />
+      <EnabledCheckbox
+        label="Image Generation through AUTOMATIC1111:"
+        isEnabled={settingStore.a1111Enabled}
+        onChange={settingStore.setA1111Enabled}
+        fetchModels={settingStore.fetchA1111Models}
+      />
+
+      <HostInput
+        defaultValue={settingStore.a1111Host}
+        fetchModels={settingStore.fetchA1111Models}
+        hasServer={settingStore.isA1111ServerConnected}
+        isEnabled={settingStore.a1111Enabled}
+        label="AUTOMATIC1111 Host:"
+        placeHolder={DefaultA1111Host}
+        setHost={settingStore.setA1111Host}
+      />
 
       <A1111SizeSelector />
       <A1111StepsSelector />

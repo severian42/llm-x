@@ -6,8 +6,9 @@ import { settingStore } from '~/models/SettingStore'
 import { toastStore } from '~/models/ToastStore'
 import { IChatModel } from '~/models/ChatModel'
 
-import { OllmaApi } from '~/utils/OllamaApi'
+import { OllamaApi } from '~/utils/OllamaApi'
 import { A1111Api } from '~/utils/A1111Api'
+import { LmsApi } from '~/utils/LmsApi'
 
 const IncomingMessageAbortedModel = types.model({
   id: types.identifier,
@@ -30,10 +31,13 @@ export const IncomingMessageStore = types
   }))
   .actions(self => ({
     async beforeDestroy() {
-      OllmaApi.cancelStream()
+      OllamaApi.cancelStream()
+      LmsApi.cancelStream()
     },
 
     deleteMessage(message: IMessageModel) {
+      this.commitMessage(message)
+
       message.selfDestruct()
     },
 
@@ -49,10 +53,12 @@ export const IncomingMessageStore = types
         self.messageAbortedById.put({ id, abortedManually: true })
 
         // error prone by quick switching during generation
-        if (settingStore.isImageGenerationMode) {
-          A1111Api.cancelGeneration()
+        if (settingStore.modelType === 'A1111') {
+          A1111Api.cancelStream(id)
+        } else if (settingStore.modelType === 'LMS') {
+          LmsApi.cancelStream(id)
         } else {
-          OllmaApi.cancelStream(id)
+          OllamaApi.cancelStream(id)
         }
 
         return
@@ -62,7 +68,14 @@ export const IncomingMessageStore = types
         self.messageAbortedById.put({ id: message, abortedManually: true })
       }
 
-      OllmaApi.cancelStream()
+      // error prone by quick switching during generation
+      if (settingStore.modelType === 'A1111') {
+        A1111Api.cancelStream()
+      } else if (settingStore.modelType === 'LMS') {
+        LmsApi.cancelStream()
+      } else {
+        OllamaApi.cancelStream()
+      }
     },
 
     async generateImage(chat: IChatModel, incomingMessage: IMessageModel) {
@@ -81,36 +94,58 @@ export const IncomingMessageStore = types
         return
       }
 
-      await incomingMessage.reset()
+      const messageToEdit = incomingMessage.selectedVariation
 
-      incomingMessage.setModelName(settingStore.selectedModelLabel)
+      messageToEdit.setModelName(settingStore.selectedModelLabel)
 
       console.log(prompt)
 
       await this.handleIncomingMessage(incomingMessage, async () => {
-        const images = await A1111Api.generateImage(prompt)
+        const images = await A1111Api.generateImage(prompt, messageToEdit)
 
-        await incomingMessage.addImages(
+        await messageToEdit.addImages(
           chat.id,
           images.map(image => 'data:image/png;base64,' + image),
         )
       })
     },
 
-    async generateMessage(chat: IChatModel, incomingMessage: IMessageModel) {
-      self.messageById.put(incomingMessage)
+    async generateVariation(chat: IChatModel, incomingMessage: IMessageModel) {
+      if (!incomingMessage.isBlank()) {
+        const variation = chat.createIncomingMessage()
 
-      if (settingStore.isImageGenerationMode) {
+        incomingMessage.addVariation(variation)
+      }
+
+      return this.generateMessage(chat, incomingMessage)
+    },
+
+    async generateMessage(chat: IChatModel, incomingMessage: IMessageModel) {
+      const messageToEdit = incomingMessage.selectedVariation
+
+      self.messageById.put(messageToEdit)
+
+      if (settingStore.modelType === 'A1111') {
         return this.generateImage(chat, incomingMessage)
       }
 
-      await incomingMessage.reset()
+      let streamChat: typeof OllamaApi.streamChat
 
-      incomingMessage.setModelName(settingStore.selectedModelLabel)
+      if (settingStore.modelType === 'LMS') {
+        streamChat = LmsApi.streamChat
+      } else {
+        streamChat = OllamaApi.streamChat
+      }
+
+      messageToEdit.setModelName(settingStore.selectedModelLabel)
 
       await this.handleIncomingMessage(incomingMessage, async () => {
-        for await (const contentChunk of OllmaApi.streamChat(chat.messages, incomingMessage)) {
-          incomingMessage.addContent(contentChunk)
+        for await (const contentChunk of streamChat(
+          chat.messages,
+          incomingMessage,
+          messageToEdit,
+        )) {
+          messageToEdit.addContent(contentChunk)
         }
       })
     },
@@ -118,24 +153,26 @@ export const IncomingMessageStore = types
     async handleIncomingMessage(incomingMessage: IMessageModel, callback: () => Promise<void>) {
       let shouldDeleteMessage = false
 
+      const messageToEdit = incomingMessage.selectedVariation
+
       try {
         await callback()
       } catch (error: unknown) {
-        if (self.messageAbortedById.get(incomingMessage.uniqId)) {
-          incomingMessage.setError(new Error('Stream stopped by user'))
+        if (self.messageAbortedById.get(messageToEdit.uniqId)) {
+          messageToEdit.setError(new Error('Stream stopped by user'))
 
-          shouldDeleteMessage = _.isEmpty(incomingMessage.content)
+          shouldDeleteMessage = _.isEmpty(messageToEdit.content)
         } else if (error instanceof Error) {
-          incomingMessage.setError(error)
+          messageToEdit.setError(error)
 
           // make sure the server is still connected
-          settingStore.updateModels()
+          settingStore.fetchOllamaModels()
         }
       } finally {
         if (shouldDeleteMessage) {
-          this.deleteMessage(incomingMessage)
+          this.deleteMessage(messageToEdit)
         } else {
-          this.commitMessage(incomingMessage)
+          this.commitMessage(messageToEdit)
         }
       }
     },

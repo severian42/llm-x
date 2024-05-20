@@ -144,14 +144,14 @@ const useRegisterModelActions = () => {
     autorun(() => {
       const nextModelActions: Action[] = []
 
-      if (_.isEmpty(settingStore.models)) {
+      if (_.isEmpty(settingStore.ollamaModels)) {
         nextModelActions.push({
           id: 'model',
           name: 'No Ollama Models to select: Refresh',
-          keywords: 'model modal open select refresh',
+          keywords: 'model modal ollama open select refresh',
           section: 'Actions',
           priority: Priority.LOW,
-          perform: settingStore.updateModels,
+          perform: settingStore.fetchOllamaModels,
         })
       }
 
@@ -159,10 +159,21 @@ const useRegisterModelActions = () => {
         nextModelActions.push({
           id: 'model',
           name: 'No A1111 Models to select: Refresh',
-          keywords: 'model modal open select refresh',
+          keywords: 'model modal a1111 automatic 1111 open select refresh',
           section: 'Actions',
           priority: Priority.LOW,
           perform: settingStore.fetchA1111Models,
+        })
+      }
+
+      if (_.isEmpty(settingStore.lmsEnabled)) {
+        nextModelActions.push({
+          id: 'model',
+          name: 'No LM Studio Models to select: Refresh',
+          keywords: 'model modal open lmstudio lm studio select refresh',
+          section: 'Actions',
+          priority: Priority.LOW,
+          perform: settingStore.fetchLmsModels,
         })
       }
 
@@ -185,7 +196,7 @@ const useRegisterModelActions = () => {
         })
       }
 
-      settingStore.models.forEach(model => {
+      settingStore.ollamaModels.forEach(model => {
         nextModelActions.push({
           id: model.name,
           name: model.name,
@@ -203,6 +214,17 @@ const useRegisterModelActions = () => {
           keywords: `${model.modelName} model`,
           section: 'A1111 Models',
           perform: () => settingStore.selectModel(model.modelName, 'A1111'),
+          parent: 'model',
+        })
+      })
+
+      settingStore.lmsModels.forEach(model => {
+        nextModelActions.push({
+          id: model.path,
+          name: model.name,
+          keywords: `${model.path} model`,
+          section: 'LM Studio Models',
+          perform: () => settingStore.selectModel(model.path, 'LMS'),
           parent: 'model',
         })
       })
@@ -311,7 +333,7 @@ const useRegisterMessageActions = () => {
   const countMessagesWithText = (messages: IMessageModel[], text: string) => {
     // if any of the lowercased messages contain the text
     return _.sumBy(messages, message => {
-      return message.content.toLowerCase().includes(text) ? 1 : 0
+      return message.selectedVariation.content.toLowerCase().includes(text) ? 1 : 0
     })
   }
 
@@ -387,7 +409,7 @@ const useNewChatActions = () => {
       } else {
         action = createAction({
           name: 'Create New chat',
-          keywords: 'creat new chat',
+          keywords: 'create new chat',
           section: 'Actions',
           perform: chatStore.createChat,
         })
@@ -414,7 +436,7 @@ const OmniBar = () => {
       keywords: 'refresh',
       section: 'Actions',
       priority: Priority.LOW,
-      perform: settingStore.updateModels,
+      perform: settingStore.refreshAllModels,
     }),
     createAction({
       name: 'Open settings',

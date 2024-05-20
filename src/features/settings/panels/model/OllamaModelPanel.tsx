@@ -1,97 +1,36 @@
 import { observer } from 'mobx-react-lite'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import _ from 'lodash'
-import { Breadcrumbs, BreadcrumbItem } from '@nextui-org/react'
 
 import { settingStore } from '~/models/SettingStore'
-import { CorrectShowResponse, ollamaStore } from '~/features/ollama/OllamaStore'
-import CopyButton from '~/components/CopyButton'
+import { IOllamaModel } from '~/models/OllamaModel'
 
-import ChevronDown from '~/icons/ChevronDown'
+import { CorrectShowResponse, ollamaStore } from '~/features/ollama/OllamaStore'
+
+import SelectionPanelTable, {
+  SortType as SelectionPanelSortType,
+} from '~/components/SelectionTablePanel'
+import CopyButton from '~/components/CopyButton'
+import BreadcrumbBar from '~/components/BreadcrumbBar'
+
 import Globe from '~/icons/Globe'
 import Image from '~/icons/Image'
 import DownloadTray from '~/icons/DownloadTray'
 import Delete from '~/icons/Delete'
+import Edit from '~/icons/Edit'
 
-enum SortType {
-  None = 'none',
-  Name = 'name',
-  Size = 'size',
-  Updated = 'modifiedAt',
-  Params = 'paramSize',
-  Image = 'supportsImages',
-}
+const ollamaModelSortTypes: Array<SelectionPanelSortType<IOllamaModel>> = [
+  { label: 'Name', value: 'name' },
+  { label: 'Params', value: 'paramSize' },
+  { label: <Image />, value: 'supportsImages', tooltip: 'Supports Images?', invertOrder: true },
+  { label: 'Size', value: 'size' },
+  { label: 'Updated', value: 'modifiedAt', invertOrder: true },
+]
 
-const OllamaModelPanelTable = observer(({ onModelSelected }: { onModelSelected: () => void }) => {
-  const { selectedModelLabel, models } = settingStore
-  const inputRef = useRef<HTMLInputElement>(null)
+const OllamaModelPanelTable = observer(({ onShowDetails }: { onShowDetails: () => void }) => {
+  const { selectedModelLabel, ollamaModels: models } = settingStore
 
-  const [activeSortType, setActiveSortType] = useState(SortType.None)
-  const [ascendingSort, setAscendingSort] = useState(true)
   const [filterText, setFilterText] = useState('')
-
-  const sortedModels = useMemo(() => {
-    if (activeSortType === SortType.None) return models
-
-    let direction: 'asc' | 'desc'
-
-    // updated: "larger" aka more recent values should come first
-    // image: "truthy" values should come first
-    if (activeSortType === SortType.Updated || activeSortType === SortType.Image) {
-      direction = ascendingSort ? 'desc' : 'asc'
-    } else {
-      direction = ascendingSort ? 'asc' : 'desc'
-    }
-
-    return _.orderBy(models, [activeSortType, SortType.Name], direction)
-  }, [activeSortType, ascendingSort, models.length])
-
-  const filteredModels = useMemo(() => {
-    if (!filterText) return sortedModels
-
-    return sortedModels.filter(model => model.name.includes(filterText))
-  }, [filterText, sortedModels])
-
-  const handleSortTypeChanged = (nextSortType: SortType) => {
-    if (activeSortType !== nextSortType) {
-      setAscendingSort(true)
-      setActiveSortType(nextSortType)
-    } else if (ascendingSort) {
-      setAscendingSort(false)
-    } else {
-      setActiveSortType(SortType.None)
-      setAscendingSort(true)
-    }
-  }
-
-  const makeChevron = (sortType: SortType) => {
-    return (
-      <span
-        className={
-          'transition-[opacity transform] ml-2 h-fit scale-90 duration-300 ease-in-out ' +
-          (ascendingSort ? ' rotate-180 ' : '') +
-          (activeSortType === sortType ? ' opacity-100 ' : ' opacity-0 ')
-        }
-      >
-        <ChevronDown />
-      </span>
-    )
-  }
-
-  const makeHeader = (label: string, sortType: SortType) => {
-    return (
-      <th>
-        <span
-          className="flex w-fit cursor-pointer select-none flex-row items-center underline"
-          onClick={() => handleSortTypeChanged(sortType)}
-        >
-          {label}
-
-          {makeChevron(sortType)}
-        </span>
-      </th>
-    )
-  }
 
   const pullModel = () => {
     ollamaStore.pull(filterText)
@@ -99,14 +38,15 @@ const OllamaModelPanelTable = observer(({ onModelSelected }: { onModelSelected: 
     settingStore.closeSettingsModal()
   }
 
-  const handleModelSelected = (modelName: string) => {
-    settingStore.selectModel(modelName)
-    onModelSelected()
+  const updateAllModels = () => {
+    ollamaStore.updateAll()
+
+    settingStore.closeSettingsModal()
   }
 
-  useEffect(() => {
-    inputRef.current?.focus()
-  }, [])
+  const handleModelSelected = (modelName: string) => {
+    settingStore.selectModel(modelName)
+  }
 
   if (!settingStore.isServerConnected) {
     const openOllamaPanel = () => {
@@ -125,118 +65,93 @@ const OllamaModelPanelTable = observer(({ onModelSelected }: { onModelSelected: 
     )
   }
 
-  return (
+  const renderRow = (model: IOllamaModel) => (
     <>
-      <label className="flex w-full flex-row gap-2">
+      <td>
+        <span className="block max-w-52 overflow-hidden font-semibold xl:max-w-80">
+          {model.name}
+        </span>
+      </td>
+
+      <td>{model.details.parameterSize}</td>
+
+      <td>
         <input
-          type="text"
-          placeholder="Filter by name or pull..."
-          className="input input-sm input-bordered sticky w-full focus:outline-none"
-          onChange={e => setFilterText(e.target.value)}
-          value={filterText}
-          ref={inputRef}
-          autoFocus
+          type="checkbox"
+          defaultChecked={model.supportsImages}
+          className="checkbox checkbox-xs tooltip tooltip-bottom"
+          data-tip="Supports Images?"
+          onClick={e => e.preventDefault()}
         />
-      </label>
+      </td>
 
-      <div className="mt-2 flex h-full flex-col overflow-y-scroll rounded-md">
-        <table className="table table-zebra table-sm -mt-4 mb-4 border-separate border-spacing-y-2 pt-0">
-          <thead className="sticky top-0 z-20 bg-base-300 text-base-content">
-            <tr>
-              {makeHeader('Name', SortType.Name)}
+      <td>{model.gbSize}</td>
+      <td className=" opacity-65">{model.timeAgo}</td>
 
-              {makeHeader('Params', SortType.Params)}
-
-              <th className="table-cell w-fit">
-                <span
-                  className="flex w-fit cursor-pointer flex-row items-center"
-                  onClick={() => handleSortTypeChanged(SortType.Image)}
-                >
-                  <span
-                    className="tooltip tooltip-bottom w-fit border-b-[1.5px] border-b-current"
-                    data-tip="Supports Images?"
-                  >
-                    <Image />
-                  </span>
-
-                  {makeChevron(SortType.Image)}
-                </span>
-              </th>
-
-              {makeHeader('Size', SortType.Size)}
-
-              {makeHeader('Updated', SortType.Updated)}
-            </tr>
-            <tr />
-          </thead>
-
-          <tbody className="-mt-4 gap-2 px-2">
-            {filteredModels?.map(model => (
-              <tr
-                className={
-                  'cursor-pointer ' +
-                  (selectedModelLabel === model?.name
-                    ? ' !bg-primary text-primary-content'
-                    : ' hover:!bg-primary/30')
-                }
-                onClick={() => handleModelSelected(model.name)}
-                style={{ borderTopLeftRadius: 8 }}
-                key={model.name}
-              >
-                <td>
-                  <span className="block max-w-52 overflow-hidden font-semibold xl:max-w-80">
-                    {model.name}
-                  </span>
-                </td>
-
-                <td>{model.details.parameterSize}</td>
-
-                <td>
-                  <input
-                    type="checkbox"
-                    defaultChecked={model.supportsImages}
-                    className="checkbox checkbox-xs tooltip tooltip-bottom"
-                    data-tip="Supports Images?"
-                  />
-                </td>
-
-                <td>{model.gbSize}</td>
-                <td className=" opacity-65">{model.timeAgo}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <div className="mx-auto mt-auto flex flex-row content-center gap-2">
-          <a
-            href="https://ollama.com/library"
-            className="btn btn-outline btn-neutral btn-sm flex w-fit flex-row gap-2 px-4"
-            target="__blank"
-            title="Open Ollama Library in new tab"
-          >
-            <span className=" whitespace-nowrap text-sm ">Ollama Library</span>
-            <Globe />
-          </a>
-
-          {filterText && (
-            <button
-              className="btn btn-neutral btn-sm flex w-fit flex-row gap-2 px-4"
-              onClick={pullModel}
-            >
-              <span className=" whitespace-nowrap text-sm ">
-                Pull model: {filterText.includes(':') ? filterText : `${filterText}:latest`}
-              </span>
-              <DownloadTray />
-            </button>
-          )}
-        </div>
-      </div>
+      <td className="w-fit">
+        <button
+          className="align-center flex opacity-30 transition-opacity duration-200 ease-in-out hover:opacity-100"
+          onClick={onShowDetails}
+        >
+          <Edit />
+        </button>
+      </td>
     </>
+  )
+
+  return (
+    <SelectionPanelTable
+      items={models}
+      sortTypes={ollamaModelSortTypes}
+      primarySortTypeLabel="name"
+      itemFilter={(model: IOllamaModel, filterText: string) =>
+        model.name.toLowerCase().includes(filterText.toLowerCase())
+      }
+      renderRow={renderRow}
+      getItemKey={model => model.name}
+      onItemSelected={model => handleModelSelected(model.name)}
+      onFilterChanged={setFilterText}
+      getIsItemSelected={model => model.name === selectedModelLabel}
+      filterInputPlaceholder="Filter by name or pull..."
+      includeEmptyHeader
+    >
+      <div className="mx-auto mt-auto flex flex-row content-center gap-2">
+        <a
+          href="https://ollama.com/library"
+          className="btn btn-outline btn-neutral btn-sm flex w-fit flex-row gap-2 px-4"
+          target="__blank"
+          title="Open Ollama Library in new tab"
+        >
+          <span className=" whitespace-nowrap text-sm ">Ollama Library</span>
+          <Globe />
+        </a>
+
+        {filterText ? (
+          <button
+            className="btn btn-neutral btn-sm flex w-fit flex-row gap-2 px-4"
+            onClick={pullModel}
+          >
+            <span className=" whitespace-nowrap text-sm ">
+              Pull model: {filterText.includes(':') ? filterText : `${filterText}:latest`}
+            </span>
+            <DownloadTray />
+          </button>
+        ) : (
+          <button
+            className="btn btn-neutral btn-sm flex w-fit flex-row gap-2 px-4"
+            onClick={updateAllModels}
+          >
+            <span className=" whitespace-nowrap text-sm ">Update all models</span>
+            <DownloadTray />
+          </button>
+        )}
+      </div>
+    </SelectionPanelTable>
   )
 })
 
 const OllamaModelSettings = observer(() => {
-  const { selectedModel } = settingStore
+  const { selectedOllamaModel: selectedModel } = settingStore
 
   const [modelData, setModelData] = useState<CorrectShowResponse | undefined>()
 
@@ -249,6 +164,12 @@ const OllamaModelSettings = observer(() => {
   if (!selectedModel || !modelData) return
 
   const details = modelData.details || {}
+
+  const updateModel = () => {
+    settingStore.closeSettingsModal()
+
+    ollamaStore.pull(selectedModel.name)
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -287,10 +208,15 @@ const OllamaModelSettings = observer(() => {
         )}
       </div>
 
-      <div className="mt-auto flex self-end">
+      <div className="mt-auto flex justify-between">
+        <button onClick={updateModel} className="btn btn-neutral btn-sm">
+          Update {selectedModel.name}
+          <DownloadTray />
+        </button>
+
         <button
           onClick={() => ollamaStore.delete(selectedModel.name)}
-          className="btn btn-ghost self-end text-error"
+          className="btn btn-ghost btn-sm self-end text-error"
         >
           <Delete className="h-5 w-5" />
         </button>
@@ -300,7 +226,7 @@ const OllamaModelSettings = observer(() => {
 })
 
 const OllamaModelPanel = observer(() => {
-  const { selectedModel } = settingStore
+  const { selectedOllamaModel: selectedModel } = settingStore
 
   const [tab, setTab] = useState<'all' | 'single'>('all')
 
@@ -313,32 +239,23 @@ const OllamaModelPanel = observer(() => {
 
   return (
     <div className="relative flex h-full w-full flex-col">
-      <Breadcrumbs className="mb-2">
-        <BreadcrumbItem
-          className={
-            tab === 'all' ? ' [&>*]:!text-primary' : 'scale-90 [&>*]:!text-base-content/70'
-          }
-          isCurrent={tab === 'all'}
-          onPress={() => setTab('all')}
-        >
-          Models
-        </BreadcrumbItem>
-
-        {selectedModel && (
-          <BreadcrumbItem
-            className={
-              tab === 'single' ? ' [&>*]:!text-primary' : 'scale-90 [&>*]:!text-base-content/70'
-            }
-            isCurrent={tab === 'single'}
-            onPress={() => setTab('single')}
-          >
-            {selectedModel.name}
-          </BreadcrumbItem>
-        )}
-      </Breadcrumbs>
+      <BreadcrumbBar
+        breadcrumbs={[
+          {
+            label: 'Models',
+            isSelected: tab === 'all',
+            onClick: () => setTab('all'),
+          },
+          selectedModel && {
+            label: selectedModel.name,
+            isSelected: tab === 'single',
+            onClick: () => setTab('single'),
+          },
+        ]}
+      />
 
       {tab === 'all' || !selectedModel ? (
-        <OllamaModelPanelTable onModelSelected={() => setTab('single')} />
+        <OllamaModelPanelTable onShowDetails={() => setTab('single')} />
       ) : (
         <OllamaModelSettings />
       )}

@@ -1,22 +1,26 @@
 import { observer } from 'mobx-react-lite'
-import { useState } from 'react'
+import { Fragment, JSX, useState } from 'react'
 
-import { settingStore } from '~/models/SettingStore'
+import { ConnectionTypes, settingStore } from '~/models/SettingStore'
 
 import AppGeneralPanel from '~/features/settings/panels/general/AppGeneralPanel'
 import OllamaGeneralPanel from '~/features/settings/panels/general/OllamaGeneralPanel'
 import A1111GeneralPanel from '~/features/settings/panels/general/A1111GeneralPanel'
+import LmsGeneralPanel from '~/features/settings/panels/general/LmsGeneralPanel'
 
-const Panels = [
+type PanelTypes = ConnectionTypes | 'App'
+
+const Panels: Array<{ title: PanelTypes; label?: string, Component: () => JSX.Element }> = [
   { title: 'App', Component: AppGeneralPanel },
   { title: 'Ollama', Component: OllamaGeneralPanel },
+  { title: 'LMS', label: 'LM Studio', Component: LmsGeneralPanel },
   { title: 'A1111', Component: A1111GeneralPanel },
 ]
 
 const GeneralModelPanel = observer(() => {
-  const { selectedModelType } = settingStore
+  const { modelType: selectedModelType } = settingStore
 
-  const [selectedTab, setSelectedTab] = useState(selectedModelType)
+  const [selectedTab, setSelectedTab] = useState<PanelTypes>(selectedModelType)
 
   return (
     <div className="flex w-full flex-col">
@@ -25,8 +29,8 @@ const GeneralModelPanel = observer(() => {
         className="tabs tabs-lifted -tabs-bordered flex-1 overflow-y-hidden"
         style={{ gridTemplateRows: 'max-content auto' }}
       >
-        {Panels.map(({ title, Component }) => (
-          <>
+        {Panels.map(({ title, label, Component }) => (
+          <Fragment key={title}>
             <input
               type="radio"
               role="tab"
@@ -36,7 +40,7 @@ const GeneralModelPanel = observer(() => {
                   ? ' [--tab-border-color:var(--fallback-bc,oklch(var(--bc)/0.45))] '
                   : ' [--tab-border-color:transparent] ')
               }
-              aria-label={title}
+              aria-label={label || title}
               checked={title === selectedTab}
               onChange={() => setSelectedTab(title)}
             />
@@ -47,7 +51,7 @@ const GeneralModelPanel = observer(() => {
             >
               <Component />
             </div>
-          </>
+          </Fragment>
         ))}
       </div>
     </div>

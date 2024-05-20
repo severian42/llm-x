@@ -8,29 +8,37 @@
 
 LLM X does not make any external api calls. (go ahead, check your network tab and see the Fetch section). Your chats and image generations are 100% private. This site / app works completely offline.
 
+# Issues:
+
+LLM X (web app) will not connect to a server that is not secure. This means that you can use LLM X on localhost (considered a [secure context](https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts)) but if you're trying to use llm-x over a network the server needs to be from https or else it will not work.
+
 # Recent additions:
 
-- Ability to pull a model
-- Ability to see model information
-- Ability to delete a model
-- Ability to see generation information on new messages
-- Regenerating a message updates the name
+- Text generation through lm studio is here! 
+- Regenerating a bot message adds it to a message variation list
+- Message headers and footers are sticky with the message, useful for long messages
 
 # How To Use:
 
-## Install Ollama (and AUTOMATIC1111):
+### Prerequisites for application
 
-- Download and install [Ollama](https://ollama.com/)
-- Pull down a model (or a few) from the [library](https://ollama.com/library) Ex: `ollama pull llava` (or use the app)
-- Download and install [AUTOMATIC1111](https://github.com/AUTOMATIC1111/stable-diffusion-webui?tab=readme-ov-file#installation-and-running) (for image generation)
+- Ollama: Download and install [Ollama](https://ollama.com/)
+  - Pull down a model (or a few) from the [library](https://ollama.com/library) Ex: `ollama pull llava` (or use the app)
+- LM Studio:  Download and install [LM Studio](https://lmstudio.ai/)
+- AUTOMATIC1111: Git clone [AUTOMATIC1111](https://github.com/AUTOMATIC1111/stable-diffusion-webui?tab=readme-ov-file#installation-and-running) (for image generation)
 
 ## How to use web client (no install):
 
-- Follow instructions for "Install Ollama"
-- Tell Ollama to listen:
-  - Use [Ollama's FAQ](https://github.com/ollama/ollama/blob/main/docs/faq.md#how-do-i-configure-ollama-server) to set `OLLAMA_ORIGINS` = `*.github.io`
-  - Run this in your terminal `OLLAMA_ORIGINS=*.github.io ollama serve`
-    - (Powershell users: `$env:OLLAMA_ORIGINS="https://%2A.github.io/"; ollama serve`)
+### Prerequisites for web client
+- Ollama Options: 
+  - Use [Ollama's FAQ](https://github.com/ollama/ollama/blob/main/docs/faq.md#how-do-i-configure-ollama-server) to set `OLLAMA_ORIGINS` = `https://mrdjohnson.github.io`
+  - Run this in your terminal `OLLAMA_ORIGINS=https://mrdjohnson.github.io ollama serve`
+    - (Powershell users: `$env:OLLAMA_ORIGINS="https://mrdjohnson.github.io"; ollama serve`)
+- LM Studio:
+  - Run this in your terminal: `lms server start --cors=true`
+- A1111: 
+  - Run this in the a1111 project folder: `./webui.sh --api --listen --cors-allow-origins "*"` 
+---
 - Use your browser to go to [LLM-X](https://mrdjohnson.github.io/llm-x/)
 - Go offline! (optional)
 - Start chatting!
@@ -44,14 +52,19 @@ LLM X does not make any external api calls. (go ahead, check your network tab an
 
 ## How to use from project:
 
-- Follow instructions for "Install Ollama"
-- Run this in your terminal `ollama serve` (no need for special origins command)
+### Prerequisites for local project
+- Ollama: Run this in your terminal `ollama serve`
+- LM Studio: Run this in your terminal: `lms server start`
+- A1111: Run this in the a1111 project folder: `./webui.sh --api --listen` 
+---
+
 - Pull down this project; `yarn install`, `yarn dev`
 - Go offline! (optional)
 - Start chatting!
 
 ## Goals / Features
 
+- [x] **LM Studio integration!**
 - [x] **Text to Image generation** through AUTOMATIC1111
 - [x] **Image to Text** using Ollama's multi modal abilities
 - [x] **Offline Support** via PWA technology
@@ -60,7 +73,7 @@ LLM X does not make any external api calls. (go ahead, check your network tab an
 - [x] Text Entry and Response to Ollama
 - [x] Auto saved Chat history
 - [x] Manage multiple chats
-- [x] Copy/Edit/Detele messages sent or recieved
+- [x] Copy/Edit/Delete messages sent or received
 - [x] Re-write user message (triggering response refresh)
 - [x] System Prompt customization through "Personas" feature
 - [x] Theme changing through DaisyUI
@@ -132,7 +145,7 @@ I couldn't help but bee cool 😎
 **_Inspiration:_**
 [ollama-ui's](https://github.com/ollama-ui/ollama-ui) project. Which allows users to connect to ollama via a [web app](https://ollama-ui.github.io/ollama-ui/)
 
-[Perplexity.ai](https://www.perplexity.ai/) Perpexlity has some amazing UI advancements in the LLM UI space and I have been very interested in getting to that point. Hopefully this starter project lets me get closer to doing something similar!
+[Perplexity.ai](https://www.perplexity.ai/) Perplexity has some amazing UI advancements in the LLM UI space and I have been very interested in getting to that point. Hopefully this starter project lets me get closer to doing something similar!
 
 ## Getting started
 

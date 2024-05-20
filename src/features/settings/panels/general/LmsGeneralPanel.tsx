@@ -5,29 +5,7 @@ import HostInput from '~/components/HostInput'
 import NumberInput from '~/components/form/NumberInput'
 import EnabledCheckbox from '~/components/EnabledCheckbox'
 
-import { DefaultHost, settingStore } from '~/models/SettingStore'
-
-const KeepAliveInput = observer(() => {
-  return (
-    <form onSubmit={e => e.preventDefault()} className="form-control flex gap-2">
-      <span
-        className="label-text tooltip tooltip-right z-30 w-fit text-sm"
-        data-tip="How long a model should be waiting for input"
-      >
-        Keep alive time:
-      </span>
-
-      <NumberInput
-        value={settingStore.ollamaKeepAliveTime}
-        max={90}
-        step={5}
-        min={0}
-        placeholder="20"
-        onChange={settingStore.setKeepAliveTime}
-      />
-    </form>
-  )
-})
+import { DefaultLmsHost, settingStore } from '~/models/SettingStore'
 
 const TemperatureInput = observer(() => {
   const rangeRef = useRef<HTMLInputElement>(null)
@@ -47,10 +25,11 @@ const TemperatureInput = observer(() => {
             type="range"
             min={0}
             max={1}
-            value={settingStore.ollamaTemperature}
-            className="range range-sm"
+            value={settingStore.lmsTemperature}
+            className="range range-sm disabled:[--range-shdw:gray]"
             step={0.05}
-            onChange={e => settingStore.setTemperature(e.target.valueAsNumber)}
+            onChange={e => settingStore.setLmsTemperature(e.target.valueAsNumber)}
+            disabled={!settingStore.lmsEnabled}
             ref={rangeRef}
           />
 
@@ -66,13 +45,14 @@ const TemperatureInput = observer(() => {
 
         <div className="flex-shrink-1">
           <NumberInput
-            value={settingStore.ollamaTemperature}
+            value={settingStore.lmsTemperature}
             step={0.05}
             min={0}
             precision={2}
             placeholder="50"
             className="max-w-[9ch]"
-            onChange={settingStore.setTemperature}
+            onChange={settingStore.setLmsTemperature}
+            disabled={!settingStore.lmsEnabled}
           />
         </div>
       </div>
@@ -80,31 +60,29 @@ const TemperatureInput = observer(() => {
   )
 })
 
-const OllamaGeneralPanel = observer(() => {
+const LmsGeneralPanel = observer(() => {
   return (
     <div className="flex h-full w-full flex-col gap-4">
       <EnabledCheckbox
-        label="Text generation through Ollama:"
-        isEnabled={settingStore.ollamaEnabled}
-        onChange={settingStore.setOllamaEnabled}
-        fetchModels={settingStore.fetchOllamaModels}
+        label="Text generation through LM Studio:"
+        isEnabled={settingStore.lmsEnabled}
+        onChange={settingStore.setLmsEnabled}
+        fetchModels={settingStore.fetchLmsModels}
       />
 
       <HostInput
-        defaultValue={settingStore.ollamaHost}
-        fetchModels={settingStore.fetchOllamaModels}
-        hasServer={settingStore.isServerConnected}
-        isEnabled
-        label="Ollama Host:"
-        placeHolder={DefaultHost}
-        setHost={settingStore.setHost}
+        defaultValue={settingStore.lmsHost}
+        hasServer={settingStore.isLmsServerConnected}
+        fetchModels={settingStore.fetchLmsModels}
+        isEnabled={settingStore.lmsEnabled}
+        label="LM Studio Host:"
+        placeHolder={DefaultLmsHost}
+        setHost={settingStore.setLmsHost}
       />
-
-      <KeepAliveInput />
 
       <TemperatureInput />
     </div>
   )
 })
 
-export default OllamaGeneralPanel
+export default LmsGeneralPanel

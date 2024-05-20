@@ -25,7 +25,7 @@ class OllamaStore {
   }
 
   get ollama() {
-    return new Ollama({ host: settingStore.host })
+    return new Ollama({ host: settingStore.ollamaHost })
   }
 
   show(modelName: string) {
@@ -35,11 +35,55 @@ class OllamaStore {
 
   delete(modelName: string) {
     return this.ollama.delete({ model: modelName }).then(() => {
-      return settingStore.updateModels()
+      return settingStore.fetchOllamaModels()
     })
   }
 
-  async pull(model: string) {
+  async updateAll() {
+    const models = (await this.ollama.list()).models
+
+    let failedTotal = 0
+
+    const totalProgress: PullProgress = makeAutoObservable({
+      label: `0% (0/${models.length})`,
+      id: _.uniqueId('ollama-pull-progress-'),
+      model: 'Updating all models',
+      status: 'incomplete',
+    })
+
+    this.pullProgresses.push(totalProgress)
+
+    for (let index = 1; index <= models.length; index++) {
+      const { name } = models[index - 1]
+
+      const progress = await this.pull(name, { isUpdate: true })
+
+      const totalPercent = Math.round((index / models.length) * 100)
+
+      totalProgress.label = `${totalPercent}% (${index}/${models.length})`
+
+      if (progress.status === 'error') {
+        failedTotal += 1
+
+        totalProgress.extra = `${failedTotal} failed to update`
+      }
+
+      this.pullProgresses = _.without(this.pullProgresses, progress)
+    }
+
+    this.pullProgresses = _.without(this.pullProgresses, totalProgress)
+
+    let finishedMessage = `Updated ${models.length - failedTotal}/${models.length} models.`
+    if (failedTotal > 0) {
+      finishedMessage += ' See more info in the console logs.'
+    }
+
+    settingStore.fetchOllamaModels().then(() => {
+      toastStore.addToast(finishedMessage, 'info')
+    })
+  }
+
+  async pull(model: string, { isUpdate }: { isUpdate?: boolean } = {}) {
     const progress: PullProgress = makeAutoObservable({
       label: '0%',
       id: _.uniqueId('ollama-pull-progress-'),
@@ -70,29 +114,38 @@ class OllamaStore {
     } catch (e) {
       progress.status = 'error'
 
-      toastStore.addToast(
-        `Something went wrong with pulling ${model} check the logs for more details`,
-        'error',
-      )
+      if (!isUpdate) {
+        toastStore.addToast(
+          `Something went wrong with pulling ${model} check the logs for more details`,
+          'error',
+        )
+      }
 
-      console.error(e)
+      // todo, these will never show on production
+      console.error(`Something went wrong with pulling ${model}`, e)
     } finally {
       if (progress.status == 'incomplete') {
         progress.label = 'Unable to complete pull.'
       } else if (progress.status === 'complete') {
-        toastStore.addToast(`Completed download of ${model}`, 'success')
+        if (!isUpdate) {
+          toastStore.addToast(`Completed download of ${model}`, 'success')
+        }
 
         progress.extra = 'Finished'
         progress.label = ''
       }
 
-      // remove the progess after 5 seconds
-      setTimeout(() => {
-        this.pullProgresses = _.without(this.pullProgresses, progress)
-      }, 5_000)
+      if (!isUpdate) {
+        // remove the progess after 5 seconds
+        setTimeout(() => {
+          this.pullProgresses = _.without(this.pullProgresses, progress)
+        }, 5_000)
 
-      settingStore.updateModels()
+        settingStore.fetchOllamaModels()
+      }
     }
+
+    return progress
   }
 }
 

@@ -57,36 +57,42 @@ const getMessages = async (chatMessages: IMessageModel[], incomingMessage: IMess
   for (const message of chatMessages) {
     if (message.uniqId === incomingMessage.uniqId) break
 
+    const selectedVariation = message.selectedVariation
+
     if (message.fromBot) {
-      messages.push(new AIMessage(message.content))
+      messages.push(new AIMessage(selectedVariation.content))
     } else {
-      messages.push(await createHumanMessage(message))
+      messages.push(await createHumanMessage(selectedVariation))
     }
   }
 
   return messages
 }
 
-export class OllmaApi {
+export class OllamaApi {
   private static abortControllerById: Record<string, AbortController> = {}
 
-  static async *streamChat(chatMessages: IMessageModel[], incomingMessage: IMessageModel) {
-    const model = settingStore.selectedModel?.name
+  static async *streamChat(
+    chatMessages: IMessageModel[],
+    incomingMessage: IMessageModel,
+    incomingMessageVariant: IMessageModel,
+  ) {
+    const model = settingStore.selectedOllamaModel?.name
     if (!model) return
 
-    const host = settingStore.host || DefaultHost
+    const host = settingStore.ollamaHost || DefaultHost
 
     const abortController = new AbortController()
 
-    OllmaApi.abortControllerById[incomingMessage.uniqId] = abortController
+    OllamaApi.abortControllerById[incomingMessageVariant.uniqId] = abortController
 
     const messages = await getMessages(chatMessages, incomingMessage)
 
     const chatOllama = new ChatOllama({
       baseUrl: host,
       model,
-      keepAlive: settingStore.keepAliveTime + 'm',
-      temperature: settingStore.temperature,
+      keepAlive: settingStore.ollamaKeepAliveTime + 'm',
+      temperature: settingStore.ollamaTemperature,
       callbacks: [
         {
           handleLLMEnd(output) {
@@ -94,7 +100,7 @@ export class OllmaApi {
               _.get(output, 'generations[0][0].generationInfo') || {}
 
             if (!_.isEmpty(generationInfo)) {
-              incomingMessage.setExtraDetails(generationInfo)
+              incomingMessageVariant.setExtraDetails(generationInfo)
             }
           },
         },
@@ -111,22 +117,22 @@ export class OllmaApi {
       yield chunk
     }
 
-    delete OllmaApi.abortControllerById[incomingMessage.uniqId]
+    delete OllamaApi.abortControllerById[incomingMessage.uniqId]
   }
 
   static cancelStream(id?: string) {
     if (id) {
-      if (!OllmaApi.abortControllerById[id]) return
+      if (!OllamaApi.abortControllerById[id]) return
 
-      OllmaApi.abortControllerById[id].abort('Stream ended manually')
+      OllamaApi.abortControllerById[id].abort('Stream ended manually')
 
-      delete OllmaApi.abortControllerById[id]
+      delete OllamaApi.abortControllerById[id]
     } else {
-      for (const id in OllmaApi.abortControllerById) {
-        OllmaApi.abortControllerById[id].abort('Stream ended manually')
+      for (const id in OllamaApi.abortControllerById) {
+        OllamaApi.abortControllerById[id].abort('Stream ended manually')
       }
 
-      OllmaApi.abortControllerById = {}
+      OllamaApi.abortControllerById = {}
     }
   }
 }

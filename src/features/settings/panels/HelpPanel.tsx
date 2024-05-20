@@ -2,13 +2,34 @@ import { observer } from 'mobx-react-lite'
 
 import CopyButton from '~/components/CopyButton'
 
-const OLLAMA_CODE = 'OLLAMA_ORIGINS=*.github.io ollama serve'
-const POWERSHELL_OLLAMA_CODE = '$env:OLLAMA_ORIGINS="https://%2A.github.io/"; ollama serve'
+const OLLAMA_CODE = 'OLLAMA_ORIGINS=https://mrdjohnson.github.io ollama serve'
+const POWERSHELL_OLLAMA_CODE = '$env:OLLAMA_ORIGINS="https://mrdjohnson.github.io"; ollama serve'
 const A1111_CODE = './webui.sh --api --listen --cors-allow-origins "*"'
+const LMS_CODE = 'lms server start --cors=true'
 
 const HelpPanel = observer(() => {
   return (
     <div className="w-full pl-2">
+      <h3 className="-ml-2 mt-5 pb-3 text-lg font-bold">
+        How to connect to
+        <a href="https://lmstudio.ai/" target="__blank" className="link text-lg">
+          LM Studio
+        </a>
+        :
+      </h3>
+
+      <p>LM Studio makes working with models easy! Use this and get going:</p>
+
+      <div className="my-4 flex flex-row place-content-center gap-2">
+        <div className="prose">
+          <code>{LMS_CODE}</code>
+        </div>
+
+        <CopyButton className="btn swap btn-sm my-auto" text={LMS_CODE} />
+      </div>
+
+      <div className="divider" />
+
       <h3 className="-ml-2 pb-3 text-lg font-bold">How to connect to Ollama Server:</h3>
 
       <div className="flex flex-col gap-2">
@@ -36,9 +57,9 @@ const HelpPanel = observer(() => {
             </span>
             <span>to be</span>
             <span className="prose mx-1">
-              <code>*.github.io</code>
+              <code>https://mrdjohnson.github.io</code>
             </span>
-            (this tells ollama that all github projects are OK to listen to).
+            (this tells ollama that mrdjohnson github projects, like this one, are OK to listen to).
             <p>
               2: You are now set up to run{' '}
               <span className="prose mx-1">
